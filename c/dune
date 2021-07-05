@@ -1,0 +1,61 @@
+; TODO: use ctypes in dune 3.0+ to factor out all of this boilerplate
+(library
+  (name fidlib_c_type_description)
+  (public_name fidlib.c_type_description)
+  (modules fidlib_c_type_description)
+  (libraries ctypes))
+
+(executable
+  (name type_gen)
+  (modules type_gen)
+  (libraries ctypes.stubs ctypes.foreign fidlib_c_type_description))
+
+(rule
+  (with-stdout-to c_generated_types.c
+    (run ./type_gen.exe)))
+
+(rule
+  (targets c_generated_types.exe)
+  (deps (:c c_generated_types.c))
+  (action (system "%{cc} %{c} \
+    -I '%{lib:ctypes:.}' \
+    -I %{ocaml_where} \
+    -o %{targets}")))
+
+(rule
+  (with-stdout-to fidlib_c_generated_types.ml
+    (run ./c_generated_types.exe)))
+
+(library
+  (name fidlib_c_function_description)
+  (public_name fidlib.c_function_description)
+  (modules fidlib_c_generated_types fidlib_c_function_description
+           fidlib_c_types)
+  (wrapped false)
+  ; c_generated_types.exe emits code with unused vars and unbound record labels
+  ;  so, we supress them here
+  (flags (:standard -w -27 -w -9))
+  (libraries ctypes fidlib_c_type_description))
+
+(executable
+  (name function_gen)
+  (modules Function_gen)
+  (libraries ctypes.stubs fidlib_c_function_description))
+
+(rule
+  (with-stdout-to c_generated_functions.c
+    (run ./function_gen.exe c fidlib_stub)))
+
+(rule
+  (with-stdout-to fidlib_c_generated_functions.ml
+    (run ./function_gen.exe ml fidlib_stub)))
+
+(library
+  (name fidlib_c)
+  (public_name fidlib.c)
+  (libraries ctypes fidlib_c_function_description)
+  (modules fidlib_c fidlib_c_generated_functions)
+  (foreign_stubs
+    (language c)
+    (names c_generated_functions fidlib)
+    (flags -DT_LINUX)))

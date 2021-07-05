@@ -1,0 +1,5 @@
+(library
+  (public_name fidlib)
+  (libraries core_kernel ctypes fidlib.c)
+  (inline_tests)
+  (preprocess (pps ppx_inline_test)))
